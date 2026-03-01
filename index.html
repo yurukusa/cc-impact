@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cc-impact — What did you actually build?</title>
+  <meta name="description" content="Paste your cc-impact --json output and get a shareable card showing what you actually produced with Claude Code.">
+  <meta property="og:title" content="cc-impact — What did you actually build?">
+  <meta property="og:description" content="Commits, lines written, files changed across all your git repos. Part of cc-toolkit.">
+  <meta property="og:url" content="https://yurukusa.github.io/cc-impact/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="cc-impact — What did you actually build with Claude Code?">
+  <meta name="twitter:description" content="Paste your --json output to visualize and share your git output stats.">
+  <meta name="twitter:site" content="@yurukusa_dev">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #56d364;
+      --red: #f85149;
+      --cyan: #58d8f0;
+      --orange: #e3b341;
+      --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+    .container { max-width: 760px; margin: 0 auto; padding: 40px 20px; }
+
+    header { text-align: center; margin-bottom: 40px; }
+    header h1 { font-size: 2.2rem; font-weight: 800; color: var(--green); margin-bottom: 8px; }
+    header p { color: var(--muted); font-size: 1rem; }
+
+    .cmd-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 32px; font-family: monospace; font-size: 0.9rem; }
+    .cmd-box .comment { color: var(--muted); }
+    .cmd-box .cmd { color: var(--green); margin: 4px 0; }
+
+    .paste-section { margin-bottom: 32px; }
+    .paste-section label { display: block; color: var(--muted); font-size: 0.82rem; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px; }
+    textarea {
+      width: 100%; height: 160px;
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px; font-family: monospace; font-size: 0.82rem;
+      resize: vertical; outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: var(--green); }
+    textarea::placeholder { color: var(--muted); }
+
+    .btn {
+      background: var(--green); color: #000; font-weight: 700;
+      border: none; border-radius: 8px; padding: 10px 24px;
+      font-size: 0.9rem; cursor: pointer; width: 100%;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-secondary {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+      font-weight: 600; border-radius: 8px; padding: 9px 20px;
+      font-size: 0.85rem; cursor: pointer; transition: border-color 0.2s;
+    }
+    .btn-secondary:hover { border-color: var(--green); }
+
+    .error { color: var(--red); font-size: 0.85rem; margin-top: 8px; }
+
+    /* Card */
+    #card { display: none; }
+    .impact-card {
+      background: linear-gradient(135deg, #0d1117 0%, #111820 100%);
+      border: 1px solid var(--green); border-radius: 16px;
+      padding: 32px; margin-bottom: 24px;
+      box-shadow: 0 0 40px rgba(86,211,100,0.08);
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: var(--green); }
+    .card-sub { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+    .card-badge { background: rgba(86,211,100,0.1); border: 1px solid rgba(86,211,100,0.3); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; color: var(--green); font-weight: 600; }
+
+    .big-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 28px; }
+    @media (max-width: 500px) { .big-stats { grid-template-columns: 1fr 1fr; } }
+    .big-stat { text-align: center; }
+    .big-num { font-size: 2rem; font-weight: 800; color: var(--cyan); line-height: 1; }
+    .big-num.green { color: var(--green); }
+    .big-num.orange { color: var(--orange); }
+    .big-label { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+    .section-title { font-size: 0.72rem; font-weight: 600; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 12px; }
+    .repo-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .repo-name { font-family: monospace; font-size: 0.8rem; color: var(--text); min-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-bg { flex: 1; background: var(--border); border-radius: 3px; height: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.6s ease; }
+    .repo-stat { font-size: 0.75rem; color: var(--muted); min-width: 70px; text-align: right; }
+
+    .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; flex-wrap: wrap; gap: 8px; }
+    .card-source { font-size: 0.72rem; color: var(--muted); }
+    .card-source a { color: var(--muted); text-decoration: none; }
+    .card-source a:hover { color: var(--cyan); }
+
+    .share-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .pace-bar { display: flex; gap: 20px; background: var(--surface); border-radius: 10px; padding: 14px 20px; margin-top: 12px; }
+    .pace-item { flex: 1; text-align: center; }
+    .pace-num { font-size: 1.3rem; font-weight: 700; color: var(--orange); }
+    .pace-label { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
+    .demo-link { text-align: center; margin-top: 24px; }
+    .demo-link a { color: var(--muted); font-size: 0.82rem; text-decoration: none; }
+    .demo-link a:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>cc-impact</h1>
+    <p>What did you actually build with Claude Code?</p>
+  </header>
+
+  <div class="cmd-box">
+    <div class="comment"># Run this in your terminal, then paste the output below</div>
+    <div class="cmd">npx cc-impact --json</div>
+    <div style="margin-top:10px;color:var(--muted);font-size:0.8rem;">Or: <span style="color:var(--text)">npx cc-impact --days=7 --json</span> &nbsp;·&nbsp; <span style="color:var(--text)">npx cc-impact --days=90 --json</span></div>
+  </div>
+
+  <div class="paste-section">
+    <label>▸ PASTE JSON OUTPUT HERE</label>
+    <textarea id="jsonInput" placeholder='{"version":"1.0.0","days":30,"summary":{"repos":28,"commits":563,...},"repos":[...]}'></textarea>
+    <div id="errMsg" class="error"></div>
+  </div>
+
+  <button class="btn" onclick="renderCard()">Visualize my impact →</button>
+
+  <div class="demo-link">
+    <a href="#" onclick="loadDemo(); return false;">▸ Load demo data (my actual stats)</a>
+  </div>
+
+  <!-- Card output -->
+  <div id="card" style="margin-top:40px;">
+    <div class="impact-card" id="impactCard">
+      <div class="card-header">
+        <div>
+          <div class="card-title">cc-impact</div>
+          <div class="card-sub" id="cardSub">Last 30 days</div>
+        </div>
+        <div class="card-badge" id="cardBadge">30 days</div>
+      </div>
+
+      <div class="big-stats">
+        <div class="big-stat">
+          <div class="big-num" id="statCommits">—</div>
+          <div class="big-label">commits</div>
+        </div>
+        <div class="big-stat">
+          <div class="big-num green" id="statLines">—</div>
+          <div class="big-label">net lines</div>
+        </div>
+        <div class="big-stat">
+          <div class="big-num orange" id="statRepos">—</div>
+          <div class="big-label">active repos</div>
+        </div>
+      </div>
+
+      <div class="section-title">▸ MOST ACTIVE REPOS</div>
+      <div id="repoList"></div>
+
+      <div class="pace-bar">
+        <div class="pace-item">
+          <div class="pace-num" id="paceCommits">—</div>
+          <div class="pace-label">commits/day</div>
+        </div>
+        <div class="pace-item">
+          <div class="pace-num" id="paceLines">—</div>
+          <div class="pace-label">net lines/day</div>
+        </div>
+        <div class="pace-item">
+          <div class="pace-num" id="paceFiles">—</div>
+          <div class="pace-label">files/day</div>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="card-source">
+          <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a>
+          · 31 free tools for Claude Code
+        </div>
+      </div>
+    </div>
+
+    <div class="share-row">
+      <button class="btn-secondary" onclick="shareTwitter()">Share on X (Twitter)</button>
+      <button class="btn-secondary" onclick="copyUrl()">Copy share URL</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEMO = {
+  "version":"1.0.0",
+  "generatedAt":"2026-03-01T01:16:53.966Z",
+  "days":30,
+  "summary":{"repos":28,"commits":563,"insertions":398448,"deletions":93371,"filesChanged":6876,"netLines":305077},
+  "repos":[
+    {"name":"spell-cascade","commits":276,"insertions":125398,"deletions":1952,"filesChanged":4319},
+    {"name":"nursery-shift","commits":72,"insertions":40990,"deletions":3845,"filesChanged":414},
+    {"name":"shared-brain","commits":44,"insertions":13720,"deletions":2100,"filesChanged":210},
+    {"name":"dung-azure-flame","commits":40,"insertions":94500,"deletions":8200,"filesChanged":580},
+    {"name":"primal-fuse","commits":20,"insertions":2100,"deletions":300,"filesChanged":80},
+    {"name":"yurukusa.github.io","commits":17,"insertions":2300,"deletions":400,"filesChanged":90},
+    {"name":"claude-code-ops-starter","commits":16,"insertions":1700,"deletions":200,"filesChanged":60},
+    {"name":"monster-den","commits":12,"insertions":13100,"deletions":500,"filesChanged":110}
+  ]
+};
+
+function fmt(n) {
+  if (Math.abs(n) >= 1000000) return (n/1000000).toFixed(1)+'M';
+  if (Math.abs(n) >= 1000) return (n/1000).toFixed(1)+'k';
+  return String(n);
+}
+
+function loadDemo() {
+  document.getElementById('jsonInput').value = JSON.stringify(DEMO, null, 2);
+  renderCard();
+}
+
+function renderCard() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  const err = document.getElementById('errMsg');
+  err.textContent = '';
+
+  let data;
+  try { data = JSON.parse(raw); } catch(e) {
+    err.textContent = '✗ Invalid JSON. Make sure to copy the full output of: npx cc-impact --json';
+    return;
+  }
+  if (!data.summary || !data.repos) {
+    err.textContent = '✗ Unexpected format. Run: npx cc-impact --json and paste the full output.';
+    return;
+  }
+
+  const { days, summary, repos } = data;
+  const { commits, insertions, deletions, filesChanged, netLines } = summary;
+
+  // Header
+  document.getElementById('cardSub').textContent = `Last ${days} days · ${summary.repos} active repos`;
+  document.getElementById('cardBadge').textContent = `${days} days`;
+
+  // Big numbers
+  document.getElementById('statCommits').textContent = commits.toLocaleString();
+  document.getElementById('statLines').textContent = (netLines >= 0 ? '+' : '') + fmt(netLines);
+  document.getElementById('statRepos').textContent = summary.repos;
+
+  // Pace
+  document.getElementById('paceCommits').textContent = (commits / days).toFixed(1);
+  document.getElementById('paceLines').textContent = (netLines >= 0 ? '+' : '') + Math.round(netLines / days).toLocaleString();
+  document.getElementById('paceFiles').textContent = Math.round(filesChanged / days).toLocaleString();
+
+  // Repo bars
+  const top = repos.slice(0, 8);
+  const maxCommits = Math.max(...top.map(r => r.commits), 1);
+  const list = document.getElementById('repoList');
+  list.innerHTML = top.map(r => `
+    <div class="repo-bar">
+      <div class="repo-name">${r.name}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.ceil(r.commits/maxCommits*100)}%"></div></div>
+      <div class="repo-stat">${r.commits} commits</div>
+    </div>
+  `).join('');
+
+  // Show card
+  document.getElementById('card').style.display = 'block';
+
+  // Update hash for sharing
+  const compressed = { d: days, s: { c: commits, i: insertions, del: deletions, f: filesChanged, n: netLines, r: summary.repos }, repos: top.map(r => ({ name: r.name, c: r.commits, i: r.insertions })) };
+  window.location.hash = btoa(JSON.stringify(compressed));
+}
+
+function shareTwitter() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  let data;
+  try { data = JSON.parse(raw); } catch { return; }
+  const { days, summary } = data;
+  const text = `My Claude Code output (last ${days} days):\n✅ ${summary.commits.toLocaleString()} commits\n📈 +${(summary.netLines/1000).toFixed(0)}k net lines\n📁 ${summary.repos} repos active\n\ncc-impact via @yurukusa_dev`;
+  const url = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent('https://yurukusa.github.io/cc-impact/')}`;
+  window.open(url, '_blank');
+}
+
+function copyUrl() {
+  const url = window.location.href;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// Load from hash on page load
+window.addEventListener('load', () => {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return;
+  try {
+    const data = JSON.parse(atob(hash));
+    // Reconstruct full format from compressed
+    const full = {
+      version: '1.0.0',
+      days: data.d,
+      summary: { repos: data.s.r, commits: data.s.c, insertions: data.s.i, deletions: data.s.del, filesChanged: data.s.f, netLines: data.s.n },
+      repos: data.repos.map(r => ({ name: r.name, commits: r.c, insertions: r.i, deletions: 0, filesChanged: 0 }))
+    };
+    document.getElementById('jsonInput').value = JSON.stringify(full, null, 2);
+    renderCard();
+  } catch(e) { /* invalid hash, ignore */ }
+});
+</script>
+</body>
+</html>
