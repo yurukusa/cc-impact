@@ -1,0 +1,34 @@
+{
+  "name": "cc-impact",
+  "version": "1.0.0",
+  "description": "What did you actually build with Claude Code? Commits, lines added, files changed across all your git repos.",
+  "bin": {
+    "cc-impact": "cli.mjs"
+  },
+  "type": "module",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "git",
+    "productivity",
+    "output",
+    "commits",
+    "developer-metrics",
+    "code-stats"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-impact.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}
