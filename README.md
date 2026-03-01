@@ -58,7 +58,7 @@ npx cc-impact           →  563 commits, +305k net lines, 28 repos
 
 ## Part of cc-toolkit
 
-One of [30 free tools](https://yurukusa.github.io/cc-toolkit/) for understanding your Claude Code usage.
+One of [32 free tools](https://yurukusa.github.io/cc-toolkit/) for understanding your Claude Code usage.
 
 ## License
 
